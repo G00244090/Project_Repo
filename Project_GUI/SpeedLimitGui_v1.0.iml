@@ -8,5 +8,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="miglayout-4.0-sources" level="project" />
+    <orderEntry type="library" name="mysql-connector-java-5.1.35-bin" level="project" />
   </component>
 </module>
