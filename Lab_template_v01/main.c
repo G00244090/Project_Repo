@@ -42,20 +42,21 @@
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
-#define SPI_MASTER_INSTANCE          (1) /*! User change define to choose SPI instance */
-#define TRANSFER_SIZE               (64)
-#define TRANSFER_BAUDRATE           (50000U)           /*! Transfer baudrate - 500k */
-#define MASTER_TRANSFER_TIMEOUT     (10000U)             /*! Transfer timeout of master - 5s */
+#define SPI_MASTER_INSTANCE         (1) /*! User change define to choose SPI instance */
+#define TRANSFER_SIZE               (1)
+#define TRANSFER_BAUDRATE           (500000U)           /*! Transfer baudrate - 500k */
+#define MASTER_TRANSFER_TIMEOUT     (10000000U)             /*! Transfer timeout of master - 5s */
 
 /*******************************************************************************
  * Variables
  ******************************************************************************/
 // Buffer for storing data received by the SPI.
-uint8_t s_spiSinkBuffer[TRANSFER_SIZE] = {};
+uint8_t s_spiSinkBuffer[TRANSFER_SIZE] = {0};
+//char test = 1B;
 //uint8_t s_spiSinkBuffer = {0x26};
 
 // Buffer that supplies data to be transmitted with the SPI.
-uint8_t s_spiSourceBuffer[TRANSFER_SIZE] = {0x01,0x30};
+uint8_t s_spiSourceBuffer[TRANSFER_SIZE] = {0x37 <<1};
 
 /*******************************************************************************
  * Code
@@ -70,8 +71,7 @@ uint8_t s_spiSourceBuffer[TRANSFER_SIZE] = {0x01,0x30};
 
 int main (void)
 {
-
-    uint8_t loopCount = 0;
+	uint8_t loopCount = 0;
     uint32_t j;
     uint32_t failCount = 0;
     uint32_t calculatedBaudRate;
@@ -81,7 +81,7 @@ int main (void)
 #if FSL_FEATURE_SPI_16BIT_TRANSFERS
         .bitCount       = kSpi8BitMode,
 #endif
-        .polarity       = kSpiClockPolarity_ActiveHigh,
+        .polarity       = kSpiClockPolarity_ActiveLow,
         .phase          = kSpiClockPhase_FirstEdge,
         .direction      = kSpiMsbFirst,
         .bitsPerSec     = TRANSFER_BAUDRATE
@@ -91,6 +91,7 @@ int main (void)
     // Init OSA layer.
     OSA_Init();
 
+//   SIM_SCGC5 |= SIM_SCGC5_PORTC_MASK;
 //    SIM_SCGC5 |= SIM_SCGC5_PORTC_MASK;
 //    PORTD_PCR4 |= PORT_PCR_MUX(0x2);
 //     PORTD_PCR5 |= PORT_PCR_MUX(0x2);
@@ -114,18 +115,18 @@ int main (void)
     SPI_DRV_MasterInit(SPI_MASTER_INSTANCE, &spiMasterState);
 
     SPI_DRV_MasterConfigureBus(SPI_MASTER_INSTANCE,&userConfig,&calculatedBaudRate);
-    PRINTF("The baudrate desired is 9600. calculated is %i\nbits per second is %i\n",calculatedBaudRate, userConfig.bitsPerSec);
+    PRINTF("The baudrate desired is 9600. calculated is %i\nbits per second is %i\n\r",calculatedBaudRate, userConfig.bitsPerSec);
     // Check if the configuration is correct
-    if (calculatedBaudRate > userConfig.bitsPerSec)
-    {
-
-        PRINTF("\r**Something failed in the master bus config \r\n");
-        return -1;
-    }
-    else
-    {
-        PRINTF("\r\nBaud rate in Hz is: %d\r\n", calculatedBaudRate);
-    }
+//    if (calculatedBaudRate > userConfig.bitsPerSec)
+//    {
+//
+//        PRINTF("\r**Something failed in the master bus config \r\n");
+//        return -1;
+//    }
+//    else
+//    {
+//        PRINTF("\r\nBaud rate in Hz is: %d\r\n", calculatedBaudRate);
+//    }
     while(1)
     {
     	 PRINTF("Inside while 1 \n");
@@ -142,7 +143,7 @@ int main (void)
         }
     	 PRINTF("MY CODE.\n");
          //Start transfer data to slave
-        if (SPI_DRV_MasterTransferBlocking(SPI_MASTER_INSTANCE, NULL, s_spiSourceBuffer,NULL, TRANSFER_SIZE, MASTER_TRANSFER_TIMEOUT) == kStatus_SPI_Timeout)
+        if (SPI_DRV_MasterTransferBlocking(SPI_MASTER_INSTANCE, NULL,s_spiSourceBuffer,s_spiSinkBuffer, TRANSFER_SIZE, MASTER_TRANSFER_TIMEOUT) == kStatus_SPI_Timeout)
         {
             PRINTF("\r\n**Sync transfer timed-out \r\n");
         }
@@ -150,23 +151,23 @@ int main (void)
         // Delay sometime to wait slave receive and send back data
         OSA_TimeDelay(500U);
 
-        // Start receive data from slave by transmit NULL bytes
-        if (SPI_DRV_MasterTransferBlocking(SPI_MASTER_INSTANCE, NULL, NULL,s_spiSinkBuffer, TRANSFER_SIZE, MASTER_TRANSFER_TIMEOUT) == kStatus_SPI_Timeout)
-        {
-            PRINTF("\r\n**Sync transfer timed-out \r\n");
-        }
+//        // Start receive data from slave by transmit NULL bytes
+//        if (SPI_DRV_MasterTransferBlocking(SPI_MASTER_INSTANCE, NULL, NULL,s_spiSinkBuffer, TRANSFER_SIZE, MASTER_TRANSFER_TIMEOUT) == kStatus_SPI_Timeout)
+//        {
+//            PRINTF("\r\n**Sync transfer timed-out \r\n");
+//        }
 
         // Verify the contents of the master sink buffer
         // refer to the slave driver for the expected data pattern
         failCount = 0; // reset failCount variable
 
-//        for (j = 0; j < TRANSFER_SIZE; j++)
-//        {
-//            if (s_spiSinkBuffer[j] != s_spiSourceBuffer[j])
-//            {
-//                 failCount++;
-//            }
-//        }
+        for (j = 0; j < TRANSFER_SIZE; j++)
+        {
+            if (s_spiSinkBuffer[j] != 0x1B)
+            {
+                 failCount++;
+            }
+        }
 
         // Print out transmit buffer.
         PRINTF("\r\nMaster transmit:");
@@ -195,10 +196,10 @@ int main (void)
         {
             PRINTF("\r\n Spi master transfer succeed! \r\n");
         }
-//        else
-//        {
-//            PRINTF("\r\n **failures detected in Spi master transfer! \r\n");
-//        }
+        else
+        {
+            PRINTF("\r\n **failures detected in Spi master transfer! \r\n");
+        }
 
         // Wait for press any key.
         PRINTF("\r\nPress any key to run again\r\n");
