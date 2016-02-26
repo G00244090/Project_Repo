@@ -27,6 +27,7 @@
 #define TRANSFER_SIZE               (1)
 #define TRANSFER_BAUDRATE           (500000U)           /*! Transfer baudrate - 500k */
 #define MASTER_TRANSFER_TIMEOUT     (10000000U)             /*! Transfer timeout of master - 5s */
+#define MF_KEY_SIZE					 6
 
 /*******************************************************************************
  * Variables
@@ -47,10 +48,50 @@ uint8_t s_spiSourceBuffer[TRANSFER_SIZE] = {0};
  * and receive the array back from slave,
  * then compare whether the two buffers are the same.
  */
+
+// A struct used for passing a MIFARE Crypto1 key
+typedef struct {
+	uint8_t keyByte[6];
+} MIFARE_Key;
+
+
+void PCD_WriteRegister(	uint8_t reg,		///< The register to write to. One of the PCD_Register enums.
+		uint8_t value		///< The value to write.
+									) {
+	uint32_t j;
+	//printf("this is the WRITE register\n");
+	 for (j = 0; j < TRANSFER_SIZE; j++)
+	 {
+		 	 s_spiSourceBuffer[j] = reg << 1 & 0x7E;
+	 }
+} // End PCD_WriteRegister()
+
+void PCD_ReadRegister(	uint8_t reg,		///< The register to write to. One of the PCD_Register enums.
+		uint8_t value		///< The value to write.
+									) {
+	uint32_t j;
+	//printf("this is the READ register\n");
+	 for (j = 0; j < TRANSFER_SIZE; j++)
+	 {
+		 	 s_spiSourceBuffer[j] = 0x80 | (reg << 1 & 0x7E);
+	 }
+} // End PCD_WriteRegister()
+
+void PCD_Init() {
+	PCD_WriteRegister(0x2A, 0x80);			// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds
+	PCD_WriteRegister(0x2B, 0xA9);		// TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25's.
+	PCD_WriteRegister(0x2C, 0x03);		// Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
+	PCD_WriteRegister(0x2D, 0xE8);
+	PCD_WriteRegister(0x15, 0x40);		// Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
+	PCD_WriteRegister(0x16, 0x3D);		// Default 0x3F. Set the preset value for the CRC coprocessor for the CalcCRC command to 0x6363 (ISO 14443-3 part 6.2.4)
+}
+
 int main (void)
 {
+	MIFARE_Key Key;
     uint8_t loopCount = 0;
     uint32_t j;
+    int8_t i;
     uint32_t failCount = 0;
     uint32_t calculatedBaudRate;
     spi_master_state_t spiMasterState;
@@ -70,6 +111,8 @@ int main (void)
     // Init OSA layer.
     OSA_Init();
 
+
+    //PCD_ReadRegister(0x37,0x00);
     PRINTF("\r\nSPI board to board non-blocking example");
     PRINTF("\r\nThis example run on instance %d", (uint32_t)SPI_MASTER_INSTANCE);
     PRINTF("\r\nBe sure master's SPI%d and slave's SPI%d are connected\r\n",
@@ -80,6 +123,14 @@ int main (void)
     SPI_DRV_MasterConfigureBus(SPI_MASTER_INSTANCE,
                                 &userConfig,
                                 &calculatedBaudRate);
+    PCD_Init();
+        for (i = 0; i < 6; i++) {
+            Key.keyByte[i] = 0xFF;
+          }
+
+        PRINTF("This code scan the MIFARE Classsic NUID.\n");
+        PRINTF("Using the following key:\n");
+        PRINTF("%02X with %i \n",Key.keyByte, MF_KEY_SIZE);
 
     // Check if the configuration is correct
     if (calculatedBaudRate > userConfig.bitsPerSec)
@@ -95,10 +146,11 @@ int main (void)
     while(1)
     {
         // Initialize the source buffer
-        for (j = 0; j < TRANSFER_SIZE; j++)
-        {
-            s_spiSourceBuffer[j] = 0x80 | (0x19 << 1 & 0x7E);
-        }
+//        for (j = 0; j < TRANSFER_SIZE; j++)
+//        {
+        	PCD_ReadRegister(0x37,0x00);
+            //s_spiSourceBuffer[j] = 0x80 | (0x37 << 1 & 0x7E);
+//        }
 
         // Reset the sink buffer
         for (j = 0; j < TRANSFER_SIZE; j++)
