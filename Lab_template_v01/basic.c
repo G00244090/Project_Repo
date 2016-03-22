@@ -415,13 +415,23 @@ bool is_present()
 		PRINTF("ComIrqReg\r\n");
 		PCD_ReadRegister(ComIrqReg, 0x00);
 
+		//PCD_WriteRegister(ComIrqReg, 0x7F);					// Clear all seven interrupt request bits
+		PRINTF("ErrorReg\r\n");
+		PCD_ReadRegister(ErrorReg, 0x00);
+
 		PCD_SetRegisterBitMask(FIFOLevelReg, 0x80);			// FlushBuffer = 1, FIFO initialization
 		PRINTF("FIFOLevelReg\r\n");
 		PCD_ReadRegister(FIFOLevelReg, 0x00);
 
+		PRINTF("ErrorReg2\r\n");
+		PCD_ReadRegister(ErrorReg, 0x00);
+
 		PCD_WriteRegister(FIFODataReg, 0x22);	// Write sendData to the FIFO
 		PRINTF("FIFODataReg\r\n");
 		PCD_ReadRegister(FIFODataReg, 0x00);
+
+		PRINTF("ErrorReg3\r\n");
+		PCD_ReadRegister(ErrorReg, 0x00);
 
 		PRINTF("BitFramingReg before\r\n");
 		PCD_ReadRegister(BitFramingReg, 0x00);
@@ -429,9 +439,15 @@ bool is_present()
 		PRINTF("BitFramingReg\r\n");
 		PCD_ReadRegister(BitFramingReg, 0x00);
 
+		PRINTF("ErrorReg4\r\n");
+		PCD_ReadRegister(ErrorReg, 0x00);
+
 		PCD_WriteRegister(CommandReg, command);				// Execute the command
 		PRINTF("CommandReg\r\n");
 		PCD_ReadRegister(CommandReg, 0x00);
+
+		PRINTF("ErrorReg5\r\n");
+		PCD_ReadRegister(ErrorReg, 0x00);
 		PRINTF("\nCommands Executed\n\r");
 
 		if (command == PCD_Transceive) {
@@ -440,6 +456,8 @@ bool is_present()
 			PRINTF("BitFramingReg\r\n");
 			PCD_ReadRegister(BitFramingReg, 0x00);
 		}
+		PRINTF("ErrorReg6\r\n");
+		PCD_ReadRegister(ErrorReg, 0x00);
 
 		PRINTF("Status2\r\n");
 		PCD_ReadRegister(Status2Reg, 0x00);
