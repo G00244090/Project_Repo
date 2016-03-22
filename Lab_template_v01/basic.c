@@ -5,16 +5,6 @@
  *      Author: Aonghus
  */
 
-
-
-
-/*
- * main2.c
- *
- *  Created on: 21 Feb 2016
- *      Author: Aonghus
- */
-
 ///////////////////////////////////////////////////////////////////////////////
 //  Includes
 ///////////////////////////////////////////////////////////////////////////////
@@ -179,7 +169,7 @@ typedef	enum PICC_Command{
 			// The commands used for MIFARE Ultralight (from http://www.nxp.com/documents/data_sheet/MF0ICU1.pdf, Section 8.6)
 			// The PICC_CMD_MF_READ and PICC_CMD_MF_WRITE can also be used for MIFARE Ultralight.
 			PICC_CMD_UL_WRITE		= 0xA2		// Writes one 4 byte page to the PICC.
-		}PICC_Command;
+} PICC_Command;
 
 
 
@@ -198,7 +188,7 @@ typedef	enum PICC_Command{
 // Buffer for storing data received by the SPI.
 uint8_t s_spiSinkBuffer[TRANSFER_SIZE] = {0};
 // Buffer that supplies data to be transmitted with the SPI.
-uint8_t s_spiSourceBuffer[TRANSFER_SIZE] = {0};
+uint8_t s_spiSourceBuffer[2] = {0};
 
 // A struct used for passing a MIFARE Crypto1 key
 typedef struct {
@@ -219,21 +209,39 @@ void PCD_ClearRegisterBitMask(	uint8_t reg,uint8_t mask) {
 void PCD_WriteRegister(uint8_t reg,uint8_t value) {
 	uint32_t j;
 	//printf("this is the WRITE register\n");
-	 for (j = 0; j < TRANSFER_SIZE; j++)
-	 {
-		 	 s_spiSourceBuffer[j] = reg  & value;
-	 }
+//	 for (j = 0; j < TRANSFER_SIZE; j++)
+//	 {
+//		 	 s_spiSourceBuffer[0] = reg  & value;
+//	 }
+	 s_spiSourceBuffer[0] = reg&0x7E;
+	 s_spiSourceBuffer[1] = value;
+	 if (SPI_DRV_MasterTransfer(SPI_MASTER_INSTANCE, NULL, s_spiSourceBuffer,NULL, 2) != kStatus_SPI_Success)
+	 	         {
+	 	             PRINTF("\r**ASync transfer failed \r\n");
+	 	         }
+	 	         while (SPI_DRV_MasterGetTransferStatus(SPI_MASTER_INSTANCE, NULL) == kStatus_SPI_Busy)
+	 	         {
+	 	         }
+
 } // End PCD_WriteRegister()
 void PCD_WriteRegister2(uint8_t reg,uint8_t value,uint8_t data) {
 	uint32_t j;
 	//printf("this is the WRITE register\n");
-	 for (j = 0; j < TRANSFER_SIZE; j++)
-	 {
-		 	 s_spiSourceBuffer[j] = reg  & value;
-	 }
-	 for (j = 0; j < TRANSFER_SIZE; j++) {
-		 s_spiSourceBuffer[j] = data;
+//	 for (j = 0; j < TRANSFER_SIZE; j++)
+//	 {
+//		 	 s_spiSourceBuffer[j] = reg  & value;
+//	 }
+	s_spiSourceBuffer[0] = reg&0x7E;
+	 for (j = 0; j < value; j++) {
+		 s_spiSourceBuffer[j+1] = data+j;
 	 	}
+	 if (SPI_DRV_MasterTransfer(SPI_MASTER_INSTANCE, NULL, s_spiSourceBuffer,NULL, 2) != kStatus_SPI_Success)
+	 {
+		 PRINTF("\r**ASync transfer failed \r\n");
+	 }
+	 while (SPI_DRV_MasterGetTransferStatus(SPI_MASTER_INSTANCE, NULL) == kStatus_SPI_Busy)
+	 {
+	 }
 } // End PCD_WriteRegister()
 
 
@@ -242,7 +250,7 @@ uint8_t PCD_ReadRegister(uint8_t reg,uint8_t value) {
 	//printf("this is the READ register\n");
 	 for (j = 0; j < TRANSFER_SIZE; j++)
 	 {
-		 	 s_spiSourceBuffer[j] = 0x80 | (reg  & 0x7E);
+		 	 s_spiSourceBuffer[j] = 0x80 | reg;
 	 }
 	 // Start transfer data to slave
 	         if (SPI_DRV_MasterTransfer(SPI_MASTER_INSTANCE, NULL, s_spiSourceBuffer,NULL, TRANSFER_SIZE) != kStatus_SPI_Success)
@@ -270,7 +278,7 @@ uint8_t PCD_ReadRegister(uint8_t reg,uint8_t value) {
 	                     {
 	                         PRINTF("\r\n    ");
 	                     }
-	                     PRINTF(" %02X", s_spiSourceBuffer[j]);
+	                     PRINTF(" %02X\n", s_spiSourceBuffer[j]);
 	                 }
 	                 // Print out receive buffer.
 	                 PRINTF("\r\nMaster receive:");
@@ -281,7 +289,7 @@ uint8_t PCD_ReadRegister(uint8_t reg,uint8_t value) {
 	                     {
 	                         PRINTF("\r\n    ");
 	                     }
-	                     PRINTF(" %02X", s_spiSinkBuffer[j]);
+	                     PRINTF(" %02X\n", s_spiSinkBuffer[j]);
 	                 }
 	                 return s_spiSinkBuffer[0];
 } // End PCD_WriteRegister()
@@ -290,7 +298,7 @@ uint8_t PCD_ReadRegister2(uint8_t reg,uint8_t n,uint8_t data,uint8_t value) {
 	//printf("this is the READ register\n");
 	 for (j = 0; j < TRANSFER_SIZE; j++)
 	 {
-		 	 s_spiSourceBuffer[j] = 0x80 | (reg  & 0x7E);
+		 	 s_spiSourceBuffer[j] = 0x80 | reg;
 	 }
 	 // Start transfer data to slave
 	         if (SPI_DRV_MasterTransfer(SPI_MASTER_INSTANCE, NULL, s_spiSourceBuffer,NULL, TRANSFER_SIZE) != kStatus_SPI_Success)
@@ -386,9 +394,10 @@ bool is_present()
 		return false;
 	}
 	PCD_ClearRegisterBitMask(CollReg, 0x80);		// ValuesAfterColl=1 => Bits received after collision are cleared.
+	PRINTF("CollReg\r\n");
+	PCD_ReadRegister(CollReg, 0x00);
 	validBits = 7;									// For REQA and WUPA we need the short frame format - transmit only 7 bits of the last (and only) byte. TxLastBits = BitFramingReg[2..0]
-													//PCD_TransceiveData(&command, 1, *bufferATQA, *bufferSize, &validBits,&rxAlign,&crc);
-													//PCD_CommunicateWithPICC(PCD_Transceive, waitIRq, sendData, sendLen, backData, backLen, validBits, rxAlign, checkCRC);
+
 
 		PRINTF("\nTrying to communicate with tag!!\n\r");
 		// Prepare values for BitFramingReg
@@ -396,12 +405,28 @@ bool is_present()
 		uint8_t bitFraming = (rxAlign << 4) + txLastBits;		// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
 
 		PCD_WriteRegister(CommandReg, PCD_Idle);			// Stop any active command.
-		PCD_WriteRegister(ComIrqReg, 0x7F);					// Clear all seven interrupt request bits
-		PCD_SetRegisterBitMask(FIFOLevelReg, 0x80);			// FlushBuffer = 1, FIFO initialization
-		PCD_WriteRegister2(FIFODataReg, sendLen, sendData);	// Write sendData to the FIFO
-		PCD_WriteRegister(BitFramingReg, bitFraming);		// Bit adjustments
-		PCD_WriteRegister(CommandReg, command);				// Execute the command
+		PRINTF("CommandReg\r\n");
+		PCD_ReadRegister(CommandReg, 0x00);
 
+		PCD_WriteRegister(ComIrqReg, 0x7F);					// Clear all seven interrupt request bits
+		PRINTF("ComIrqReg\r\n");
+		PCD_ReadRegister(ComIrqReg, 0x00);
+
+		PCD_SetRegisterBitMask(FIFOLevelReg, 0x80);			// FlushBuffer = 1, FIFO initialization
+		PRINTF("FIFOLevelReg\r\n");
+		PCD_ReadRegister(FIFOLevelReg, 0x00);
+
+		PCD_WriteRegister(FIFODataReg, 0x22);	// Write sendData to the FIFO
+		PRINTF("FIFODataReg\r\n");
+		PCD_ReadRegister(FIFODataReg, 0x00);
+
+		PCD_WriteRegister(BitFramingReg, bitFraming);		// Bit adjustments
+		PRINTF("BitFramingReg\r\n");
+		PCD_ReadRegister(BitFramingReg, 0x00);
+
+		PCD_WriteRegister(CommandReg, command);				// Execute the command
+		PRINTF("CommandReg\r\n");
+		PCD_ReadRegister(CommandReg, 0x00);
 		PRINTF("\nCommands Executed\n\r");
 
 		if (command == PCD_Transceive) {
@@ -417,8 +442,8 @@ bool is_present()
 			PRINTF("\nReading ComIrqReg\r\n");
 			n = PCD_ReadRegister(ComIrqReg,0x00);	// ComIrqReg[7..0] bits are: Set1 TxIRq RxIRq IdleIRq HiAlertIRq LoAlertIRq ErrIRq TimerIRq
 			PRINTF("\n**Returned %d Also %02X \n\r",n,n);
-			for(delay =0;delay <2000000;delay++)
-			{}
+//			for(delay =0;delay <2000000;delay++)
+//			{}
 			if (n & waitIRq) {					// One of the interrupts that signal success has been set.
 				PRINTF("Interrupt : %20X",n&waitIRq);
 				break;
@@ -432,6 +457,7 @@ bool is_present()
 				return false;
 			}
 		}
+		return true;
 		PRINTF("\nNow at error checking\n\r");
 		// Stop now if any errors except collisions were detected.
 		uint8_t errorRegValue = PCD_ReadRegister(ErrorReg,0x00); // ErrorReg[7..0] bits are: WrErr TempErr reserved BufferOvfl CollErr CRCErr ParityErr ProtocolErr
@@ -494,19 +520,42 @@ void PCD_Init() {
 	// When communicating with a PICC we need a timeout if something goes wrong.
 	// f_timer = 13.56 MHz / (2*TPreScaler+1) where TPreScaler = [TPrescaler_Hi:TPrescaler_Lo].
 	// TPrescaler_Hi are the four low bits in TModeReg. TPrescaler_Lo is TPrescalerReg.
+	PRINTF("Testing\r\n");
+	PRINTF("Write TModeReg\r\n");
 	PCD_WriteRegister(TModeReg, 0x80);			// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds
+	PCD_ReadRegister(TModeReg, 0x00);			// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds
+
+	PRINTF("TPrescalerReg\n");
 	PCD_WriteRegister(TPrescalerReg, 0xA9);		// TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25s.
+	PCD_ReadRegister(TPrescalerReg,0x00);
+
+	PRINTF("TReloadRegH\n");
 	PCD_WriteRegister(TReloadRegH, 0x03);		// Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
+	PCD_ReadRegister(TReloadRegH,0x00);
+
+	PRINTF("TReloadRegL\n");
 	PCD_WriteRegister(TReloadRegL, 0xE8);
+	PCD_ReadRegister(TReloadRegL,0x00);
+
+	PRINTF("TxASKReg\n");
 	PCD_WriteRegister(TxASKReg, 0x40);		// Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
+	PCD_ReadRegister(TxASKReg,0x00);
+
+	PRINTF("ModeReg\n");
 	PCD_WriteRegister(ModeReg, 0x3D);		// Default 0x3F. Set the preset value for the CRC coprocessor for the CalcCRC command to 0x6363 (ISO 14443-3 part 6.2.4)
+	PCD_ReadRegister(ModeReg,0x00);
+
+	PRINTF("RFCfgReg\n");
 	PCD_WriteRegister(RFCfgReg, (0x07<<4)); // Set Rx Gain to max
+	PCD_ReadRegister(RFCfgReg,0x00);
+
+	PRINTF("ComIEnReg\n");
+	PCD_WriteRegister(ComIEnReg,0x20);
+	PCD_ReadRegister(ComIEnReg,0x00);
+
 	PCD_AntennaOn();						// Enable the antenna driver pins TX1 and TX2 (they were disabled by the reset)
 }
-/**
- * Turns the antenna on by enabling pins TX1 and TX2.
- * After a reset these pins are disabled.
- */
+
 void PCD_AntennaOn() {
 	uint8_t value = PCD_ReadRegister(TxControlReg,0x00);
 	if ((value & 0x03) != 0x03) {
@@ -519,6 +568,7 @@ int main (void)
     uint8_t loopCount = 0;
     uint32_t j;
     int8_t i;
+    int8_t n;
     uint32_t failCount = 0;
     uint32_t calculatedBaudRate;
     spi_master_state_t spiMasterState;
@@ -527,8 +577,8 @@ int main (void)
 #if FSL_FEATURE_SPI_16BIT_TRANSFERS
         .bitCount       = kSpi8BitMode,
 #endif
-        .polarity       = kSpiClockPolarity_ActiveHigh,
-        .phase          = kSpiClockPhase_FirstEdge,
+        .polarity       = kSpiClockPolarity_ActiveLow,
+        .phase          = kSpiClockPhase_SecondEdge,
         .direction      = kSpiMsbFirst,
         .bitsPerSec     = TRANSFER_BAUDRATE
     };
@@ -542,26 +592,27 @@ int main (void)
     //PCD_ReadRegister(0x37,0x00);
     PRINTF("\r\nSPI board to board non-blocking example");
     PRINTF("\r\nThis example run on instance %d", (uint32_t)SPI_MASTER_INSTANCE);
-    PRINTF("\r\nBe sure master's SPI%d and slave's SPI%d are connected\r\n",
-                    (uint32_t)SPI_MASTER_INSTANCE, (uint32_t)SPI_MASTER_INSTANCE);
+    PRINTF("\r\nBe sure master's SPI%d and slave's SPI%d are connected\r\n",(uint32_t)SPI_MASTER_INSTANCE, (uint32_t)SPI_MASTER_INSTANCE);
 
     // Init and setup baudrate for the master
     SPI_DRV_MasterInit(SPI_MASTER_INSTANCE, &spiMasterState);
-    SPI_DRV_MasterConfigureBus(SPI_MASTER_INSTANCE,
-                                &userConfig,
-                                &calculatedBaudRate);
+    SPI_DRV_MasterConfigureBus(SPI_MASTER_INSTANCE,&userConfig,&calculatedBaudRate);
 
         for (i = 0; i < 6; i++) {
             Key.keyBytes[i] = 0xFF;
           }
         PCD_Init();
+
+        n = PCD_ReadRegister(VersionReg,0x00);	// ComIrqReg[7..0] bits are: Set1 TxIRq RxIRq IdleIRq HiAlertIRq LoAlertIRq ErrIRq TimerIRq
+        PRINTF("\n**Version %02X \n\r",n);
+
         PRINTF("This code scan the MIFARE Classsic NUID.\n\r");
-        PRINTF("Using the following key:\n\r");
-        PRINTF("%d with %i \n\r",Key.keyBytes, MF_KEY_SIZE);
+        //PRINTF("Using the following key:\n\r");
+        //PRINTF("%d with %i \n\r",Key.keyBytes, MF_KEY_SIZE);
         while(1)
         {
-        for(j=0;j<MF_KEY_SIZE;j++)
-        	PRINTF("t: %02X\n\r",Key.keyBytes[j]);
+//        for(j=0;j<MF_KEY_SIZE;j++)
+//        	PRINTF("t: %02X\n\r",Key.keyBytes[j]);
         while(is_present() == false)
         {/*PRINTF("Waiting\r");*/}
 
