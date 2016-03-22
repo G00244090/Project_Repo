@@ -196,8 +196,11 @@ typedef struct {
 } MIFARE_Key;
 void PCD_SetRegisterBitMask(uint8_t reg,uint8_t mask) {
 	uint8_t tmp;
+	uint8_t msk;
 	tmp = PCD_ReadRegister(reg,0x00);
-	PCD_WriteRegister(reg, tmp | mask);			// set bit mask
+	msk = tmp|mask;
+	PRINTF("Tmp: %02X, Mask: %02X, OR'ed: %02X",tmp,mask,msk);
+	PCD_WriteRegister(reg,msk);			// set bit mask
 } // End PCD_SetRegisterBitMask()
 
 void PCD_ClearRegisterBitMask(	uint8_t reg,uint8_t mask) {
@@ -420,6 +423,8 @@ bool is_present()
 		PRINTF("FIFODataReg\r\n");
 		PCD_ReadRegister(FIFODataReg, 0x00);
 
+		PRINTF("BitFramingReg before\r\n");
+		PCD_ReadRegister(BitFramingReg, 0x00);
 		PCD_WriteRegister(BitFramingReg, bitFraming);		// Bit adjustments
 		PRINTF("BitFramingReg\r\n");
 		PCD_ReadRegister(BitFramingReg, 0x00);
@@ -432,8 +437,12 @@ bool is_present()
 		if (command == PCD_Transceive) {
 			PRINTF("Matches\n\r");
 			PCD_SetRegisterBitMask(BitFramingReg, 0x80);	// StartSend=1, transmission of data starts
+			PRINTF("BitFramingReg\r\n");
+			PCD_ReadRegister(BitFramingReg, 0x00);
 		}
 
+		PRINTF("Status2\r\n");
+		PCD_ReadRegister(Status2Reg, 0x00);
 		// Wait for the command to complete.
 		// In PCD_Init() we set the TAuto flag in TModeReg. This means the timer automatically starts when the PCD stops transmitting.
 		// Each iteration of the do-while-loop takes 17.86s.
